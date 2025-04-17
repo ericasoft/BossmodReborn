@@ -121,6 +121,12 @@ public abstract class Basexan<AID, TraitID>(RotationModuleManager manager, Actor
             NextGCDPrio = priority;
         }
     }
+    protected void ClearGCD()
+    {
+        NextGCD = default;
+        NextGCDPrio = default;
+        Hints.ActionsToExecute.Clear();
+    }
 
     protected void PushOGCD<P>(AID aid, Actor? target, P priority, float delay = 0) where P : Enum
         => PushOGCD(aid, target, (int)(object)priority, delay);
