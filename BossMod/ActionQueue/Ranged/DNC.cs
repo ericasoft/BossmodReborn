@@ -118,6 +118,7 @@ public enum SID : uint
 
     //Shared
     Peloton = ClassShared.SID.Peloton, // applied by Peloton to self/party
+    Medicated = ClassShared.SID.Medicated
 }
 
 public sealed class Definitions : IDisposable
