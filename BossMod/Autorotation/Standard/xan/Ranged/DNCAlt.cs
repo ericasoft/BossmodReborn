@@ -51,6 +51,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
     public float LastDanceLeft; // 30s max
     public float FinishingMoveLeft; // 30s max
     public float DanceOfTheDawnLeft; // 30s max
+    public float BuffsLeft;
 
     private Enemy? BestFan4Target;
     private Enemy? BestRangedAOETarget;
@@ -113,6 +114,8 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
 
         NumDanceTargets = NumNearbyTargets(strategy, 15);
         NumAOETargets = NumMeleeAOETargets(strategy);
+
+        BuffsLeft = Math.Max(Math.Max(StatusLeft(SID.Medicated), TechFinishLeft), DevilmentLeft);
 
         if (ImprovisationLeft > 0)
         {
@@ -235,7 +238,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             PushGCD(AID.SaberDance, BestRangedAOETarget);
 
         // With well aligned dance partner buffs, you might accidentally reach 100 very quickly from 80, so we make the margin a bit bigger during raid buff
-        if (TechFinishLeft > GCDLength && ShouldSaberDance(strategy, 75))
+        if (BuffsLeft > GCD && ShouldSaberDance(strategy, 75))
             PushGCD(AID.SaberDance, BestRangedAOETarget);
 
         if (!IsForceST && canStarfall)
@@ -246,13 +249,13 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             PushGCD(AID.Tillana, Player);
 
         //If we have technical finish for starting+finishing dance (2 GCDs) + 2 steps, do standard step ASAP
-        if (!IsForceST && TechFinishLeft > 2 * GCDLength + 2 && shouldStdStep)
+        if (!IsForceST && BuffsLeft > 2 * GCDLength + 2 && shouldStdStep)
         {
             PushGCD(AID.StandardStep, Player, 3);
         }
 
         // With well aligned dance partner buffs, you might accidentally reach 100 very quickly from 80, so we make the margin a bit bigger during raid buff
-        if (TechFinishLeft > GCDLength && ShouldSaberDance(strategy, 70))
+        if (BuffsLeft > GCD && ShouldSaberDance(strategy, 70))
             PushGCD(AID.SaberDance, BestRangedAOETarget);
 
         //If we have time to wait until next GCD, try to make sure we empty our esprit gauge first to not overcap
@@ -267,10 +270,10 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         if (!IsForceST && LastDanceLeft > 0 && (ReadyIn(AID.StandardStep) > GCD && ReadyIn(AID.StandardStep) <= GCD + 2 * GCDLength || ReadyIn(AID.FinishingMove) > GCD && ReadyIn(AID.FinishingMove) <= GCD + 2 * GCDLength))
             PushGCD(AID.LastDance, BestRangedAOETarget);
 
-        if (TechFinishLeft > GCDLength && ShouldSaberDance(strategy, 50))
+        if (BuffsLeft > GCD && ShouldSaberDance(strategy, 50))
             PushGCD(AID.SaberDance, BestRangedAOETarget);
 
-        if (!IsForceST && LastDanceLeft > GCDLength && TechFinishLeft > GCDLength && OnCooldown(AID.Devilment))
+        if (!IsForceST && LastDanceLeft > GCD && BuffsLeft > GCD && OnCooldown(AID.Devilment))
             PushGCD(AID.LastDance, BestRangedAOETarget);
 
         // Time left for technical + start technical + finish technical + last dance itself + 4 steps = 3 GCD + 4 + time left
@@ -430,7 +433,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         if (Feathers == 4 && (CanFlow(primaryTarget, out _) || CanSymmetry(primaryTarget, out _)))
             return true;
 
-        return TechFinishLeft > AnimLock;
+        return BuffsLeft > AnimLock;
     }
 
     private bool IsFan4Target(Actor primary, Actor other) => Hints.TargetInAOECone(other, Player.Position, 15, Player.DirectionTo(primary), 60.Degrees());

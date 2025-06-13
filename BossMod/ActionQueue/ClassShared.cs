@@ -113,6 +113,7 @@ public enum SID : uint
 {
     None = 0,
 
+    Medicated = 49, // applied by potion to self
     Sprint = 50, // applied by Sprint to self
 
     // Tank
