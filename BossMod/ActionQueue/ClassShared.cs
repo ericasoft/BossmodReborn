@@ -99,6 +99,7 @@ public enum SID : uint
     #region PvE
     None = 0,
 
+    Medicated = 49, // applied by potion to self
     Sprint = 50, // applied by Sprint to self
 
     // Tank
