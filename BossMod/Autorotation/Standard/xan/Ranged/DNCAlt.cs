@@ -183,7 +183,8 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         }
 
         // Helps reset after cutscenes/deaths
-        if (StandardFinishLeft <= 0 && !OnCooldown(AID.StandardStep) && NumDanceTargets > 0)
+        // Also useful when out of dance range for an extended amount of time, or when in forced single target mode
+        if (StandardFinishLeft <= 2 * GCD + 2 && !OnCooldown(AID.StandardStep) && NumRangedAOETargets > 0)
         {
             PushGCD(AID.StandardStep, Player, 100);
             return;
