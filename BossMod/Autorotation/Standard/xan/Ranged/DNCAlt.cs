@@ -437,7 +437,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         return BuffsLeft > AnimLock;
     }
 
-    private bool IsFan4Target(Actor primary, Actor other) => Hints.TargetInAOECone(other, Player.Position, 15, Player.DirectionTo(primary), 60.Degrees());
+    private bool IsFan4Target(Actor primary, Actor other) => TargetInAOECone(other, Player.Position, 15, Player.DirectionTo(primary), 60.Degrees());
 
     private Actor? FindDancePartner()
     {
