@@ -5,7 +5,7 @@ using static BossMod.AIHints;
 
 namespace BossMod.Autorotation.xan;
 
-public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attackxan<AID, TraitID>(manager, player)
+public sealed class DNCAlt(RotationModuleManager manager, Actor player) : AttackxanOld<AID, TraitID>(manager, player)
 {
     public enum Track { Partner = SharedTrack.Count, UsePot }
     public enum PartnerStrategy { Automatic, Manual }
@@ -15,15 +15,15 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
     {
         var def = new RotationModuleDefinition("xan-erica DNC", "Dancer", "Optimized rotation (xan-erica)|Ranged", "xan, erica", RotationModuleQuality.Good, BitMask.Build(Class.DNC), 100, 80);
 
-        def.DefineShared().AddAssociatedActions(AID.TechnicalStep, AID.Devilment);
+        def.DefineShared("Technical Step").AddAssociatedActions(AID.TechnicalStep);
 
         def.Define(Track.Partner).As<PartnerStrategy>("Partner")
-            .AddOption(PartnerStrategy.Automatic, "Auto", "Choose dance partner automatically (based on job aDPS)")
-            .AddOption(PartnerStrategy.Manual, "Manual", "Do not choose dance partner automatically");
+            .AddOption(PartnerStrategy.Automatic, "Choose dance partner automatically (based on job aDPS)")
+            .AddOption(PartnerStrategy.Manual, "Do not choose dance partner automatically");
 
         def.Define(Track.UsePot).As<PotionStrategy>("Potion")
-            .AddOption(PotionStrategy.None, "None", "Do not use any potions")
-            .AddOption(PotionStrategy.Grade3, "Grade 3", "Use Grade 3 gemdraughts");
+            .AddOption(PotionStrategy.None, "Do not use any potions")
+            .AddOption(PotionStrategy.Grade3, "Use Grade 3 gemdraughts");
 
         return def;
     }
