@@ -13,7 +13,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
 
     public static RotationModuleDefinition Definition()
     {
-        var def = new RotationModuleDefinition("xan-erica DNC", "Dancer", "Optimized rotation (xan-erica)|Ranged", "xan, erica", RotationModuleQuality.Good, BitMask.Build(Class.DNC), 100, 80);
+        var def = new RotationModuleDefinition("xan-erica DNC", "Dancer", "Optimized rotation (xan-erica)|Ranged", "xan, erica", RotationModuleQuality.Good, BitMask.Build(Class.DNC), 100);
 
         def.DefineShared("Technical Step").AddAssociatedActions(AID.TechnicalStep);
 
@@ -186,6 +186,13 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         // Also useful when out of dance range for an extended amount of time, or when in forced single target mode
         if (StandardFinishLeft <= 2 * GCD + 2 && !OnCooldown(AID.StandardStep) && NumRangedAOETargets > 0)
         {
+            if (strategy.BuffsOk() && TechFinishLeft > 15 && FinishingMoveLeft == 0 && (!OnCooldown(AID.Flourish) || ReadyIn(AID.Flourish) < GCD))
+            {
+                ClearGCD();
+                PushOGCD(AID.Flourish, Player, 100);
+                return;
+            }
+
             PushGCD(AID.StandardStep, Player, 100);
             return;
         }
@@ -211,7 +218,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         var combo2 = NumAOETargets > 1 ? AID.Bladeshower : AID.Fountain;
         var haveCombo2 = Unlocked(combo2) && ComboLastMove == (NumAOETargets > 1 ? AID.Windmill : AID.Cascade);
 
-        if (!IsForceST && DanceOfTheDawnLeft > GCD && DanceOfTheDawnLeft <= GCDLength && Esprit >= 50)
+        if (!IsForceST && DanceOfTheDawnLeft > GCD && Esprit >= 50)
             PushGCD(AID.DanceOfTheDawn, BestRangedAOETarget, 4);
 
         if (!IsForceST && canStarfall && FlourishingStarfallLeft <= GCDLength)
@@ -220,9 +227,6 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         // the targets for these two will be auto fixed if they are AOE actions
         if (!IsForceST && ReadyIn(AID.FinishingMove) < GCDLength && FinishingMoveLeft >= GCDLength && NumDanceTargets > 0)
             PushGCD(AID.FinishingMove, Player, 5);
-
-        if (!IsForceST && DanceOfTheDawnLeft > GCD && Esprit >= 50)
-            PushGCD(AID.DanceOfTheDawn, BestRangedAOETarget);
 
         if (!IsForceST && DanceOfTheDawnLeft > GCD + GCDLength && FlourishingFinishLeft > GCD && Esprit < 25)
             PushGCD(AID.Tillana, BestRangedAOETarget);
@@ -252,6 +256,13 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         //If we have technical finish for starting+finishing dance (2 GCDs) + 2 steps, do standard step ASAP
         if (!IsForceST && BuffsLeft > 2 * GCDLength + 2 && shouldStdStep)
         {
+            if (strategy.BuffsOk() && TechFinishLeft > 15 && FinishingMoveLeft == 0 && (!OnCooldown(AID.Flourish) || ReadyIn(AID.Flourish) < GCD))
+            {
+                ClearGCD();
+                PushOGCD(AID.Flourish, Player, 100);
+                return;
+            }
+
             PushGCD(AID.StandardStep, Player, 3);
         }
 
