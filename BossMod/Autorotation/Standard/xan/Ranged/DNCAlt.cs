@@ -5,27 +5,38 @@ using static BossMod.AIHints;
 
 namespace BossMod.Autorotation.xan;
 
-public sealed class DNCAlt(RotationModuleManager manager, Actor player) : AttackxanOld<AID, TraitID>(manager, player)
+public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attackxan<AID, TraitID, DNCAlt.Strategy>(manager, player, PotionType.Dexterity)
 {
-    public enum Track { Partner = SharedTrack.Count, UsePot }
-    public enum PartnerStrategy { Automatic, Manual }
-    public enum PotionStrategy { None, Grade3 }
+    public struct Strategy : IStrategyCommon
+    {
+        public Track<Targeting> Targeting;
+        public Track<AOEStrategy> AOE;
+        [Track("Tech Step", Actions = [AID.TechnicalStep, AID.SingleTechnicalFinish, AID.DoubleTechnicalFinish, AID.TripleTechnicalFinish, AID.QuadrupleTechnicalFinish, AID.SingleTechnicalFinish2, AID.DoubleTechnicalFinish2, AID.TripleTechnicalFinish2, AID.QuadrupleTechnicalFinish2], MinLevel = 70)]
+        public Track<OffensiveStrategy> Buffs;
+
+        [Track("Dance Partner", Action = AID.ClosedPosition, MinLevel = 60)]
+        public Track<PartnerStrategy> Partner;
+
+        [Track("Potion")]
+        public Track<DisabledByDefault> Potion;
+
+        readonly Targeting IStrategyCommon.Targeting => Targeting.Value;
+        readonly AOEStrategy IStrategyCommon.AOE => AOE.Value;
+    }
 
     public static RotationModuleDefinition Definition()
     {
-        var def = new RotationModuleDefinition("xan-erica DNC", "Dancer", "Optimized rotation (xan-erica)|Ranged", "xan, erica", RotationModuleQuality.Good, BitMask.Build(Class.DNC), 100);
+        return new RotationModuleDefinition("xan-erica DNC", "Dancer", "Optimized rotation (xan-erica)|Ranged", "xan, erica", RotationModuleQuality.Good, BitMask.Build(Class.DNC), 100).WithStrategies<Strategy>();
+    }
 
-        def.DefineShared("Technical Step").AddAssociatedActions(AID.TechnicalStep);
-
-        def.Define(Track.Partner).As<PartnerStrategy>("Partner")
-            .AddOption(PartnerStrategy.Automatic, "Choose dance partner automatically (based on job aDPS)")
-            .AddOption(PartnerStrategy.Manual, "Do not choose dance partner automatically");
-
-        def.Define(Track.UsePot).As<PotionStrategy>("Potion")
-            .AddOption(PotionStrategy.None, "Do not use any potions")
-            .AddOption(PotionStrategy.Grade3, "Use Grade 3 gemdraughts");
-
-        return def;
+    public enum PartnerStrategy
+    {
+        [Option("Choose based on job DPS")]
+        Automatic,
+        [Option("Do not automatically choose")]
+        Manual,
+        [Option("Use on a specific party member", Targets = ActionTargets.Party, Context = StrategyContext.Plan)]
+        SelectTarget
     }
 
     public byte Feathers;
@@ -76,7 +87,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         _ => 0
     };
 
-    public override void Exec(StrategyValues strategy, Enemy? primaryTarget)
+    public override void Exec(in Strategy strategy, Enemy? primaryTarget)
     {
         SelectPrimaryTarget(strategy, ref primaryTarget, range: 25);
 
@@ -89,7 +100,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         NextStep = curStep > 0 ? curStep + 15998 : curStep;
         Esprit = gauge.Esprit;
 
-        IsForceST = strategy.Option(SharedTrack.AOE).As<AOEStrategy>() is AOEStrategy.ForceST;
+        IsForceST = strategy.AOE.Value is AOEStrategy.ForceST;
 
         StandardStepLeft = StatusLeft(SID.StandardStep);
         StandardFinishLeft = StatusLeft(SID.StandardFinish);
@@ -131,16 +142,15 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         }
 
         if (Unlocked(AID.ClosedPosition)
-            && strategy.Option(Track.Partner).As<PartnerStrategy>() == PartnerStrategy.Automatic
             && StatusLeft(SID.ClosedPosition) == 0
             && ReadyIn(AID.ClosedPosition) == 0
             && !IsDancing
-            && FindDancePartner() is Actor partner)
+            && FindDancePartner(strategy.Partner) is Actor partner)
             PushGCD(AID.ClosedPosition, partner);
 
         OGCD(strategy, primaryTarget);
 
-        var approach = IsDancing || ReadyIn(AID.StandardStep) <= GCD || strategy.BuffsOk() && ReadyIn(AID.TechnicalStep) <= GCD;
+        var approach = IsDancing || ReadyIn(AID.StandardStep) <= GCD || strategy.Buffs.Value != OffensiveStrategy.Delay && ReadyIn(AID.TechnicalStep) <= GCD;
 
         GoalZoneCombined(strategy, approach ? 15 : 25, Hints.GoalAOECircle(IsDancing ? 15 : 5), AID.StandardFinish, 2);
 
@@ -149,7 +159,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             List<byte> steps = new List<byte>(4);
             steps.AddRange(gauge.DanceSteps);
 
-            if (steps.Distinct().Count() == 4 && strategy.Option(Track.UsePot).As<PotionStrategy>() == PotionStrategy.Grade3)
+            if (steps.Distinct().Count() == 4 && strategy.Potion.Value == DisabledByDefault.Enabled)
             {
                 Hints.ActionsToExecute.Push(ActionDefinitions.IDPotionDex, Player, 8000);
             }
@@ -186,7 +196,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         // Also useful when out of dance range for an extended amount of time, or when in forced single target mode
         if (StandardFinishLeft <= 2 * GCD + 2 && !OnCooldown(AID.StandardStep) && NumRangedAOETargets > 0)
         {
-            if (strategy.BuffsOk() && TechFinishLeft > 15 && FinishingMoveLeft == 0 && (!OnCooldown(AID.Flourish) || ReadyIn(AID.Flourish) < GCD))
+            if (strategy.Buffs.Value != OffensiveStrategy.Delay && TechFinishLeft > 15 && FinishingMoveLeft == 0 && (!OnCooldown(AID.Flourish) || ReadyIn(AID.Flourish) < GCD))
             {
                 ClearGCD();
                 PushOGCD(AID.Flourish, Player, 100);
@@ -203,7 +213,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             return;
         }
 
-        if (strategy.BuffsOk() && TechFinishLeft > 15 && DevilmentLeft == 0 && (!OnCooldown(AID.Devilment) || ReadyIn(AID.Devilment) < GCD))
+        if (strategy.Buffs.Value != OffensiveStrategy.Delay && TechFinishLeft > 15 && DevilmentLeft == 0 && (!OnCooldown(AID.Devilment) || ReadyIn(AID.Devilment) < GCD))
         {
             ClearGCD();
             PushOGCD(AID.Devilment, Player, 100);
@@ -256,7 +266,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         //If we have technical finish for starting+finishing dance (2 GCDs) + 2 steps, do standard step ASAP
         if (!IsForceST && BuffsLeft > 2 * GCDLength + 2 && shouldStdStep)
         {
-            if (strategy.BuffsOk() && TechFinishLeft > 15 && FinishingMoveLeft == 0 && (!OnCooldown(AID.Flourish) || ReadyIn(AID.Flourish) < GCD))
+            if (strategy.Buffs.Value != OffensiveStrategy.Delay && TechFinishLeft > 15 && FinishingMoveLeft == 0 && (!OnCooldown(AID.Flourish) || ReadyIn(AID.Flourish) < GCD))
             {
                 ClearGCD();
                 PushOGCD(AID.Flourish, Player, 100);
@@ -329,7 +339,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
 
     }
 
-    private void OGCD(StrategyValues strategy, Enemy? primaryTarget)
+    private void OGCD(in Strategy strategy, Enemy? primaryTarget)
     {
         if (CountdownRemaining > 0)
         {
@@ -342,7 +352,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         if (IsDancing)
             return;
 
-        if (strategy.BuffsOk() && TechFinishLeft > 10 && (!OnCooldown(AID.Devilment) || CanWeave(AID.Devilment)))
+        if (strategy.Buffs.Value != OffensiveStrategy.Delay && TechFinishLeft > 10 && (!OnCooldown(AID.Devilment) || CanWeave(AID.Devilment)))
         {
             PushOGCD(AID.Devilment, Player, 100);
             return;
@@ -367,14 +377,14 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             PushOGCD(f1ToUse, primaryTarget);
     }
 
-    private bool ShouldStdStep(StrategyValues strategy)
+    private bool ShouldStdStep(in Strategy strategy)
     {
         return (!OnCooldown(AID.StandardStep) || ReadyIn(AID.StandardStep) <= GCDLength) && NumDanceTargets > 0 && !IsForceST;
     }
 
-    private bool ShouldTechStep(StrategyValues strategy)
+    private bool ShouldTechStep(in Strategy strategy)
     {
-        if (!strategy.BuffsOk())
+        if (strategy.Buffs.Value == OffensiveStrategy.Delay)
             return false;
 
         // Ensure the buffs align - wait if can't weave between tech finish and next GCD - i.e. extra 2 GCD (start, finish) + 4 steps
@@ -420,7 +430,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         return danceTimeLeft > GetApplicationDelay(AID.StandardFinish) && NumDanceTargets >= minimumTargets;
     }
 
-    private bool ShouldSaberDance(StrategyValues strategy, int minimumEsprit)
+    private bool ShouldSaberDance(in Strategy strategy, int minimumEsprit)
     {
         if (Esprit < 50 || !Unlocked(AID.SaberDance))
             return false;
@@ -428,7 +438,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         return !IsForceST && Esprit >= minimumEsprit && NumRangedAOETargets > 0;
     }
 
-    private bool ShouldSpendFeathers(StrategyValues strategy, Enemy? primaryTarget)
+    private bool ShouldSpendFeathers(in Strategy strategy, Enemy? primaryTarget)
     {
         if (Feathers == 0)
             return false;
@@ -438,7 +448,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             return true;
 
         // If allow risk of overcapping when very close to buff window to maximize chance of 4 feathers. Can probably be done better by combinning with below.
-        if (strategy.BuffsOk() && ReadyIn(AID.TechnicalStep) < 4 * GCD)
+        if (strategy.Buffs.Value != OffensiveStrategy.Delay && ReadyIn(AID.TechnicalStep) < 4 * GCD)
             return false;
 
         // Keep 4 feathers until a flow or symmetry is available, to maximize feathers available during buff window
@@ -449,10 +459,28 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
     }
 
     private bool IsFan4Target(Actor primary, Actor other) => TargetInAOECone(other, Player.Position, 15, Player.DirectionTo(primary), 60.Degrees());
-
-    private Actor? FindDancePartner()
+    private Actor? FindDancePartner(in Track<PartnerStrategy> p)
     {
-        var partner = World.Party.WithoutSlot(excludeAlliance: true, excludeNPCs: true).Exclude(Player).Where(x => Player.DistanceToHitbox(x) <= 30).MaxBy(p => p.Class switch
+        var partner = p.Value switch
+        {
+            PartnerStrategy.Automatic => FindAutoPartner(),
+            PartnerStrategy.SelectTarget => ResolveTargetOverride(p.TrackRaw),
+            _ => null
+        };
+
+        if (partner != null)
+        {
+            // target is in cutscene, we're probably in a raid or something - wait for it to finish
+            if (World.Party.Members[World.Party.FindSlot(partner.InstanceID)].InCutscene)
+                return null;
+        }
+
+        return partner;
+    }
+
+    private Actor? FindAutoPartner()
+    {
+        return World.Party.WithoutSlot(excludeAlliance: true, excludeNPCs: true).Exclude(Player).Where(x => Player.DistanceToHitbox(x) <= 30).MaxBy(p => p.Class switch
         {
             Class.SAM => 100,
             Class.NIN or Class.VPR or Class.ROG => 99,
@@ -466,17 +494,6 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             Class.BRD or Class.ARC => 68,
             Class.DNC => 67,
             _ => 1
-        });
-
-        if (partner != null)
-        {
-            // target is in cutscene, we're probably in a raid or something - wait for it to finish
-            if (World.Party.Members[World.Party.FindSlot(partner.InstanceID)].InCutscene)
-                return null;
-
-            return partner;
-        }
-
-        return World.Actors.FirstOrDefault(x => x.Type == ActorType.Chocobo && x.OwnerID == Player.InstanceID);
+        }) ?? World.Actors.FirstOrDefault(x => x.Type == ActorType.Chocobo && x.OwnerID == Player.InstanceID);
     }
 }
