@@ -181,6 +181,7 @@ public sealed class ActionDefinitions : IDisposable
     public static readonly ActionID WardensPaean = new(ActionType.Spell, 3561u);
     public static readonly ActionID IDPotionStr = new(ActionType.Item, 1045995u); // hq grade 3 gemdraught of strength
     public static readonly ActionID IDPotionDex = new(ActionType.Item, 1045996u); // hq grade 3 gemdraught of dexterity
+    public static readonly ActionID IDPotionDex4 = new(ActionType.Item, 1049235u); // hq grade 4 gemdraught of dexterity
     public static readonly ActionID IDPotionVit = new(ActionType.Item, 1045997u); // hq grade 3 gemdraught of vitality
     public static readonly ActionID IDPotionInt = new(ActionType.Item, 1045998u); // hq grade 3 gemdraught of intelligence
     public static readonly ActionID IDPotionMnd = new(ActionType.Item, 1045999u); // hq grade 3 gemdraught of mind
@@ -242,6 +243,7 @@ public sealed class ActionDefinitions : IDisposable
         // items (TODO: more generic approach is needed...)
         RegisterItem(IDPotionStr);
         RegisterItem(IDPotionDex);
+        RegisterItem(IDPotionDex4);
         RegisterItem(IDPotionVit);
         RegisterItem(IDPotionInt);
         RegisterItem(IDPotionMnd);

@@ -18,7 +18,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         public Track<PartnerStrategy> Partner;
 
         [Track("Potion")]
-        public Track<DisabledByDefault> Potion;
+        public Track<PotionStrategy> Potion;
 
         readonly Targeting IStrategyCommon.Targeting => Targeting.Value;
         readonly AOEStrategy IStrategyCommon.AOE => AOE.Value;
@@ -37,6 +37,16 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         Manual,
         [Option("Use on a specific party member", Targets = ActionTargets.Party, Context = StrategyContext.Plan)]
         SelectTarget
+    }
+
+    public enum PotionStrategy
+    {
+        [Option("Disabled")]
+        Disabled,
+        [Option("Grade 3")]
+        Grade3,
+        [Option("Grade 4")]
+        Grade4
     }
 
     public byte Feathers;
@@ -159,9 +169,14 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             List<byte> steps = new List<byte>(4);
             steps.AddRange(gauge.DanceSteps);
 
-            if (steps.Distinct().Count() == 4 && strategy.Potion.Value == DisabledByDefault.Enabled)
+            if (steps.Distinct().Count() == 4 && strategy.Potion.Value != PotionStrategy.Disabled)
             {
-                Hints.ActionsToExecute.Push(ActionDefinitions.IDPotionDex, Player, 8000);
+                Hints.ActionsToExecute.Push(
+                    strategy.Potion.Value == PotionStrategy.Grade3
+                        ? ActionDefinitions.IDPotionDex
+                        : ActionDefinitions.IDPotionDex4,
+                    Player,
+                    8000);
             }
 
             if (NextStep != 0)
