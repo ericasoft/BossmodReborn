@@ -18,7 +18,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         public Track<PartnerStrategy> Partner;
 
         [Track("Potion")]
-        public Track<DisabledByDefault> Potion;
+        public Track<PotionStrategy> Potion;
 
         readonly Targeting IStrategyCommon.Targeting => Targeting.Value;
         readonly AOEStrategy IStrategyCommon.AOE => AOE.Value;
@@ -37,6 +37,16 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
         Manual,
         [Option("Use on a specific party member", Targets = ActionTargets.Party, Context = StrategyContext.Plan)]
         SelectTarget
+    }
+
+    public enum PotionStrategy
+    {
+        [Option("Disabled")]
+        Disabled,
+        [Option("Enabled (2m)")]
+        Enabled2Min,
+        [Option("Enabled (1m)")]
+        Enabled1Min
     }
 
     public byte Feathers;
@@ -159,7 +169,7 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             List<byte> steps = new List<byte>(4);
             steps.AddRange(gauge.DanceSteps);
 
-            if (steps.Distinct().Count() == 4 && strategy.Potion.Value == DisabledByDefault.Enabled)
+            if (steps.Distinct().Count() == 4 && strategy.Potion.Value != PotionStrategy.Disabled)
             {
                 Hints.ActionsToExecute.Push(ActionDefinitions.IDPotionDex, Player, 8000);
             }
@@ -358,8 +368,20 @@ public sealed class DNCAlt(RotationModuleManager manager, Actor player) : Attack
             return;
         }
 
-        if (ReadyIn(AID.Devilment) > 55)
-            PushOGCD(AID.Flourish, Player);
+        if (ReadyIn(AID.Devilment) > 50)
+        {
+            var flourishReady = !OnCooldown(AID.Flourish);
+            var flourishReadyIn = ReadyIn(AID.Flourish);
+            if (strategy.Potion.Value == PotionStrategy.Enabled1Min && (flourishReady || flourishReadyIn < GCDLength + GCD))
+            {
+                Hints.ActionsToExecute.Push(ActionDefinitions.IDPotionDex, Player, 8000);
+            }
+
+            if ((flourishReady || flourishReadyIn < GCD) && CanWeave(AID.Flourish))
+            {
+                PushOGCD(AID.Flourish, Player, 90);
+            }
+        }
 
         if ((TechFinishLeft == 0 || OnCooldown(AID.Devilment)) && ThreefoldLeft > AnimLock && NumRangedAOETargets > 0 && CanWeave(AID.FanDanceIII))
             PushOGCD(AID.FanDanceIII, BestRangedAOETarget);
